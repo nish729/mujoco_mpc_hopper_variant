@@ -1,39 +1,68 @@
-<!--
-Based on Coulomb's [1] rather than Spong's [2] model.
-[1] Coulom, Rémi. Reinforcement learning using neural networks, with applications to motor control.
-    Diss. Institut National Polytechnique de Grenoble-INPG, 2002.
-[2] Spong, Mark W. "The swing up control problem for the acrobot."
-    IEEE control systems 15, no. 1 (1995): 49-55.
--->
 <mujoco model="acrobot">
-  <default>
-    <joint damping=".05"/>
-    <geom type="capsule" mass="1"/>
-  </default>
+  <option timestep="0.0025"/>
 
-  <option timestep="0.01">
-    <flag constraint="disable" energy="enable"/>
-  </option>
+  <statistic extent="2" center="0 0 1"/>
+
+  <default>
+    <joint damping=".1" armature="0.01" limited="true" solimplimit="0 .99 .01"/>
+    <geom contype="1" conaffinity="0" friction=".7 .1 .1"/>
+    <motor ctrlrange="-1 1" ctrllimited="true"/>
+    <site size="0.01"/>
+    <default class="hopper">
+      <geom material="self" type="capsule"/>
+      <joint axis="0 -1 0"/>
+    </default>
+  </default> 
 
   <worldbody>
-    <light name="light" pos="0 0 6"/>
-    <geom name="floor" size="3 3 .2" type="plane" material="blue_grid"/>
-    <site name="target" type="sphere" pos="0 0 4" size="0.2" material="target" group="3"/>
-    <camera name="fixed" pos="0 -6 2" zaxis="0 -1 0"/>
-    <camera name="lookat" mode="targetbodycom" target="upper_arm" pos="0 -2 3"/>
-    <body name="upper_arm" pos="0 0 2">
-      <joint name="shoulder" type="hinge" axis="0 1 0"/>
-      <geom name="upper_arm_decoration" material="decoration" type="cylinder" fromto="0 -.06 0 0 .06 0" size="0.051" mass="0"/>
-      <geom name="upper_arm" fromto="0 0 0 0 0 1" size="0.05" material="self"/>
-      <body name="lower_arm" pos="0 0 1">
-        <joint name="elbow" type="hinge" axis="0 1 0"/>
-        <geom name="lower_arm" fromto="0 0 0 0 0 1" size="0.049" material="self"/>
-        <site name="tip" pos="0 0 1" size="0.01"/>
+    <geom name="floor" type="plane" conaffinity="1" pos="998 0 0" size="1000 .8 .2" material="blue_grid" zaxis="0 0 1"/>
+    <camera name="sideon" pos="0 -10 5"  mode="targetbody" target="torso" fovy="45"/>
+    <camera name="float_far" pos="-4 0 2" xyaxes="0 -1 0 .5 0 1" mode="trackcom" fovy="90"/>
+    <camera name="NL_Tracking" pos="-2 -12 4" xyaxes="2 -1 0 .5 0 1" mode="trackcom" fovy="45"/>
+    <!--pos = x, y, z-->
+    <!-- description of position: x positive to the right, y positive into the screen, z positive going upwards-->
+    <!-- xyaxes , currently points 45 degrees from x to y, slightly downwards-->
+    <!-- xyaxes: (0,1,2,3,4,5)-->
+    <!-- 0: 0 to 1: rotated towards +y axis. 1 to 2: rotate more towards +y axis-->
+    <!-- 1: -1 to 1: flipped it some weird way. -1 to 0: directly parallel to floor, seems to be some sort of rotation-->
+
+    <body name="torso" pos="0 0 1.3" childclass="hopper"> <!-- IHMPC: pos="0 0 1.3" OG:  pos="0 0 1.25"-->
+      <light name="light" pos="0 0 2" mode="trackcom"/>
+      <camera name="floating"  pos="-2 0 1" xyaxes="0 -1 0 .5 0 1" mode="trackcom" fovy="90"/>
+      <camera name="egocentric"  pos=".25 0 .11" xyaxes="0 -1 0 0 0 1" fovy="90" />
+
+      <joint name="rootz" axis="0 0 1" type="slide" limited="false" armature="0" damping="0" pos = "0 0 0" stiffness="0"/>
+      <joint name="rootx" axis="1 0 0" type="slide" limited="false" armature="0" damping="0" pos = "0 0 0" stiffness="0"/>
+      <joint name="rooty" axis="0 1 0" type="hinge" limited="false" armature="0" damping="0" pos = "0 0 0" stiffness="0"/>
+
+      <geom name="torso" size="0.05 0.2" friction="0.9"/> <!-- IHMPC: "0.07 0.3" seems like OG version has a size (radius) of 0.05 and a length of 0.4 giving us: size = "0.05 0.4""--> 
+      <!-- for torso size: zeroth element seems to be radius size, and must be positive. 1st element is length-->
+      <!-- after putting in what seems to be correct torso size, it is still the largest geom when it should be the smallest... maybe the others are too small?-->
+      <site name="torso_site" pos="0 0 0" size="0.01"/>
+
+      <body name="right_thigh" pos="0 0 -0.425"> <!-- IHMPC: pos="0 -.05 -0.3" OG:  pos="0 0 1.05"-->
+        <joint name="right_hip" pos="0 0 0.225" range="-150 0"/> <!-- IHMPC: -20 100. OG: -150 0-->
+        <geom name="right_thigh" size="0.05 0.225" friction="0.9"/> <!-- IHMPC pos: pos="0 0 -0.225" OG pos: fromto="0 0 1.45 0 0 1.05"-->
+        <!-- IHMPC: size = "0.05 0.225" (radius=0.05 length=0.225) OG: size="0.05 length=0.45"-->
+        <!-- for right_thigh: z must be negative (otherwise it goes upwards)-->
+
+        <body name="right_leg" pos="0 0 -0.475"> <!-- IHMPC: pos="0 0 -0.7?" OG: pos="0 0 0.35"-->
+          <joint name="right_knee" pos="0 0 0.25" range="-150 0"/>  <!-- IHMPC: -150 0. OG: -150 0-->
+          <!-- right_knee IHMPC: pos = "0 0 0.25" -->
+          <geom name="right_leg" size="0.04 0.25" friction="0.9"/> <!--IHMPC: size = "0.04 0.25" OG: size="0.04 0.5"-->
+
+          <body name="right_foot" pos="0.13 0 -0.25"> <!-- IHMPC: pos="0.06 0 -0.25" OG: pos="0.13 0 0"-->
+            <joint name="right_ankle" pos="-0.13 0 0" range="-45 45"/>  <!-- IHMPC: -45 45. OG: -45 45-->
+            <geom name="right_foot" zaxis="1 0 0" size="0.06 0.195" friction="2.0"/> <!-- IHMPC: size="0.05 0.1" OG: size="0.06 "-->
+          </body>
+        </body>
       </body>
     </body>
   </worldbody>
 
-   <actuator>
-    <motor name="elbow" joint="elbow" gear="2" ctrllimited="true" ctrlrange="-1 1"/>
+  <actuator>
+    <motor name="right_hip" joint="right_hip" gear="200"/> <!--IHMPC: 100. OG: 200-->
+    <motor name="right_knee" joint="right_knee" gear="200"/> <!--IHMPC: 50. OG: 200-->
+    <motor name="right_ankle" joint="right_ankle" gear="200"/> <!--IHMPC: 20. OG: 200-->
   </actuator>
 </mujoco>
